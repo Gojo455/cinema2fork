@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AbujaCine — Abuja's Smartest Cinema Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/main.css"/>
+<!-- Paystack Inline JS (real) -->
+<script src="https://js.paystack.co/v1/inline.js"></script>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────────────────── -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">
+      <span class="logo-mark">✦</span>
+      <span class="logo-text">AbujaCine</span>
+    </a>
+    <div class="nav-center" id="nav-links">
+      <button class="nav-link" onclick="showSection('browse')">Films</button>
+      <button class="nav-link" id="rec-nav" onclick="showSection('recommendations')" style="display:none">For You</button>
+      <button class="nav-link" id="tix-nav" onclick="showSection('my-bookings')" style="display:none">My Tickets</button>
+      <button class="nav-link" onclick="showSection('cinemas')">Cinemas</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">◑</button>
+      <div id="nav-auth" class="nav-auth">
+        <button class="btn-outline sm" onclick="openModal('login-modal')">Sign In</button>
+        <button class="btn-rose sm" onclick="openModal('register-modal')">Join Free</button>
+      </div>
+      <div id="nav-user" class="nav-user" style="display:none">
+        <span class="user-chip" id="user-chip"></span>
+        <button class="btn-outline sm" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────────────────────────────── -->
+<header class="hero">
+  <div class="hero-bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="petal-grid"></div>
+  </div>
+  <div class="hero-content">
+    <span class="hero-pill">✦ Abuja's AI Cinema Experience</span>
+    <h1 class="hero-title">Find your perfect<br/><em>seat & story</em></h1>
+    <p class="hero-sub">Our smart recommender matches you with the right film, the right cinema, and the perfect seat — based on your taste and seating style.</p>
+    <div class="hero-actions">
+      <button class="btn-rose lg" onclick="showSection('browse')">Browse Films</button>
+      <button class="btn-outline lg" id="hero-rec-btn" onclick="showSection('recommendations')" style="display:none">My Picks ✦</button>
+    </div>
+    <div class="hero-cinemas">
+      <span class="cinema-dot">Silverbird CBD</span>
+      <span class="cinema-dot">Genesis Ceddi Plaza</span>
+      <span class="cinema-dot">Ozone Jabi</span>
+      <span class="cinema-dot">FilmHouse Lugbe</span>
+    </div>
+  </div>
+  <div class="hero-art">
+    <div class="film-strip">
+      <div class="film-frame f1"></div>
+      <div class="film-frame f2"></div>
+      <div class="film-frame f3"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ── MAIN ──────────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- BROWSE -->
+  <section class="section" id="section-browse">
+    <div class="section-top">
+      <div>
+        <h2 class="section-title">Now Showing</h2>
+        <p class="section-sub">Hollywood & Nollywood films across Abuja</p>
+      </div>
+      <div class="filter-row">
+        <input class="filter-input" type="search" id="search-input" placeholder="Search films…" oninput="filterMovies()"/>
+        <select class="filter-select" id="genre-select" onchange="filterMovies()">
+          <option value="">All Genres</option>
+        </select>
+      </div>
+    </div>
+    <div class="movies-grid" id="movies-grid"></div>
+  </section>
+
+  <!-- RECOMMENDATIONS -->
+  <section class="section hidden" id="section-recommendations">
+    <div class="section-top">
+      <div>
+        <h2 class="section-title">Curated For You ✦</h2>
+        <p class="section-sub">Ranked by genre affinity, seat quality & your seating style</p>
+      </div>
+      <div class="pref-card" id="pref-card"></div>
+    </div>
+    <div class="rec-legend">
+      <div class="rec-legend-item"><span class="dot rose"></span> Genre match</div>
+      <div class="rec-legend-item"><span class="dot gold"></span> Seat quality score</div>
+      <div class="rec-legend-item"><span class="dot sage"></span> Seat preference match</div>
+    </div>
+    <div class="movies-grid" id="recs-grid"></div>
+  </section>
+
+  <!-- MY TICKETS -->
+  <section class="section hidden" id="section-my-bookings">
+    <div class="section-top">
+      <h2 class="section-title">My Tickets</h2>
+    </div>
+    <div id="tickets-list"></div>
+  </section>
+
+  <!-- CINEMAS -->
+  <section class="section hidden" id="section-cinemas">
+    <div class="section-top">
+      <h2 class="section-title">Our Cinemas in Abuja</h2>
+    </div>
+    <div class="cinemas-grid" id="cinemas-grid"></div>
+  </section>
+
+</main>
+
+<!-- ── MOVIE DETAIL MODAL ────────────────────────────────────────────────── -->
+<div class="overlay hidden" id="movie-modal" onclick="closeOverlay(event,'movie-modal')">
+  <div class="modal wide-modal">
+    <button class="close-btn" onclick="closeModal('movie-modal')">✕</button>
+    <div id="movie-detail"></div>
+  </div>
+</div>
+
+<!-- ── SEAT MAP MODAL ────────────────────────────────────────────────────── -->
+<div class="overlay hidden" id="seat-modal" onclick="closeOverlay(event,'seat-modal')">
+  <div class="modal xl-modal">
+    <button class="close-btn" onclick="closeSeatModal()">✕</button>
+    <div id="seat-content"></div>
+  </div>
+</div>
+
+<!-- ── PAYMENT MODAL ─────────────────────────────────────────────────────── -->
+<div class="modal-backdrop hidden" id="payment-modal">
+  <div class="modal-box" style="max-width:500px">
+    <button class="modal-close" onclick="closeModal('payment-modal')">✕</button>
+    <div id="payment-content">
+      <!-- Dynamic payment content filled by goToPayment() -->
+    </div>
+  </div>
+</div>
+
+
+<!-- ── BOOKING CONFIRMED ─────────────────────────────────────────────────── -->
+<div class="modal-backdrop hidden" id="confirm-modal">
+  <div class="modal-box confirm-box">
+    <div id="confirm-content">
+      <!-- Dynamic confirmation content filled by showConfirmation() -->
+    </div>
+  </div>
+</div>
+
+<!-- ── LOGIN ──────────────────────────────────────────────────────────────── -->
+<div class="overlay hidden" id="login-modal" onclick="closeOverlay(event,'login-modal')">
+  <div class="modal sm-modal">
+    <button class="close-btn" onclick="closeModal('login-modal')">✕</button>
+    <div class="auth-wrap">
+      <div class="auth-brand">✦ AbujaCine</div>
+      <h2>Welcome back</h2>
+      <p class="auth-hint">Sign in to unlock personalised recommendations</p>
+      <div id="login-err" class="form-err hidden"></div>
+      <label>Username or Email
+        <input type="text" id="login-user" placeholder="you@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')login()"/>
+      </label>
+      <label>Password
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
+      </label>
+      <button class="btn-rose full mt" onclick="login()">Sign In</button>
+      <p class="auth-switch">No account? <a onclick="switchModal('register-modal','login-modal')">Create one →</a></p>
+      <div class="demo-info">Demo credentials: <code>demo</code> / <code>demo123</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── REGISTER ───────────────────────────────────────────────────────────── -->
+<div class="overlay hidden" id="register-modal" onclick="closeOverlay(event,'register-modal')">
+  <div class="modal sm-modal">
+    <button class="close-btn" onclick="closeModal('register-modal')">✕</button>
+    <div class="auth-wrap">
+      <div class="auth-brand">✦ AbujaCine</div>
+      <h2>Create account</h2>
+      <p class="auth-hint">Join for AI-powered cinema recommendations</p>
+      <div id="reg-err" class="form-err hidden"></div>
+      <label>Username
+        <input type="text" id="reg-user" placeholder="filmfan_abuja" autocomplete="username"/>
+      </label>
+      <label>Email
+        <input type="email" id="reg-email" placeholder="you@email.com" autocomplete="email"/>
+      </label>
+      <label>Password
+        <input type="password" id="reg-pass" placeholder="Min 6 characters" autocomplete="new-password"/>
+      </label>
+      <button class="btn-rose full mt" onclick="register()">Create Account</button>
+      <p class="auth-switch">Already have one? <a onclick="switchModal('login-modal','register-modal')">Sign in →</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ──────────────────────────────────────────────────────────────── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ── SEAT TOOLTIP ───────────────────────────────────────────────────────── -->
+<div id="seat-tooltip" class="seat-tooltip"></div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo footer-logo">K<span>Sync</span><div class="logo-dot"></div></div>
+      <p>Real-time seat-aware movie recommendations & cinema booking across Abuja, Nigeria.</p>
+      <p style="font-size:.73rem;color:var(--muted);margin-top:8px">Flask · SQLite · Vanilla JS · Hybrid AI Recommender</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Navigate</h4>
+        <a href="#" onclick="showPage('home')">Home</a>
+        <a href="#" onclick="showPage('movies')">Movies</a>
+        <a href="#" onclick="showPage('cinemas')">Cinemas</a>
+        <a href="#" onclick="showPage('mybookings')">My Bookings</a>
+      </div>
+      <div class="footer-col">
+        <h4>Cinemas</h4>
+        <a href="#">Silverbird CBD</a>
+        <a href="#">Genesis Ceddi Plaza</a>
+        <a href="#">Ozone Jabi Lake</a>
+        <a href="#">FilmHouse Lugbe</a>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <a href="#">hello@abuja cine.ng</a>
+        <a href="#">+234 706 203 1357 KSYNC NG</a>
+        <a href="#">Abuja, FCT, Nigeria</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Abuja cine. All rights reserved.</span>
+    <span>Real-Time Seat-Aware Movie Recommender System — School Project</span>
+  </div>
+</footer>
+
+
+<script>window.PAYSTACK_PUBLIC_KEY = "{{ paystack_public_key }}";</script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AbujaCine Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/main.css"/>
+<link rel="stylesheet" href="/static/css/admin.css"/>
+</head>
+<body class="admin-body">
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">✦ Admin</div>
+    <nav class="sidebar-nav">
+      <button class="slink active" onclick="tab('dashboard',this)">📊 Dashboard</button>
+      <button class="slink" onclick="tab('movies',this)">🎬 Movies</button>
+      <button class="slink" onclick="tab('showtimes',this)">🕐 Showtimes</button>
+      <button class="slink" onclick="tab('bookings',this)">🎟 Bookings</button>
+    </nav>
+    <a href="/" class="slink" style="margin-top:auto">← Main Site</a>
+  </aside>
+  <main class="admin-main">
+    <div class="apanel active" id="panel-dashboard">
+      <h1 class="atitle">Dashboard</h1>
+      <div class="stats-row" id="stats-row"></div>
+      <h2 class="asub">Top Films by Bookings</h2>
+      <div id="popular-list"></div>
+    </div>
+    <div class="apanel" id="panel-movies">
+      <div class="apanel-head"><h1 class="atitle">Movies</h1><button class="btn-rose" onclick="openModal('add-movie-modal')">+ Add Movie</button></div>
+      <div id="movies-tbl"></div>
+    </div>
+    <div class="apanel" id="panel-showtimes">
+      <div class="apanel-head"><h1 class="atitle">Showtimes</h1><button class="btn-rose" onclick="prepShowtime()">+ Add Showtime</button></div>
+      <div id="showtimes-tbl"></div>
+    </div>
+    <div class="apanel" id="panel-bookings">
+      <h1 class="atitle">Bookings</h1>
+      <div id="bookings-tbl"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Movie -->
+<div class="overlay hidden" id="add-movie-modal" onclick="closeOverlay(event,'add-movie-modal')">
+  <div class="modal sm-modal">
+    <button class="close-btn" onclick="closeModal('add-movie-modal')">✕</button>
+    <h2 style="margin-bottom:1.25rem">Add Movie</h2>
+    <div id="mf-err" class="form-err hidden"></div>
+    <label>Title<input type="text" id="m-title"/></label>
+    <label>Genre
+      <select id="m-genre"><option>Action</option><option>Comedy</option><option>Drama</option><option>Horror</option><option>Sci-Fi</option><option>Thriller</option><option>Romance</option><option>Adventure</option><option>Nollywood</option></select>
+    </label>
+    <label>Description<textarea id="m-desc" rows="3"></textarea></label>
+    <label>Duration (min)<input type="number" id="m-dur" value="120"/></label>
+    <label>Rating (0–10)<input type="number" id="m-rat" step="0.1" min="0" max="10" value="7.0"/></label>
+    <label>Poster URL<input type="text" id="m-poster" placeholder="https://image.tmdb.org/t/p/w500/…"/></label>
+    <label>Director<input type="text" id="m-dir"/></label>
+    <label>Cast<input type="text" id="m-cast" placeholder="Actor A, Actor B"/></label>
+    <label>Year<input type="number" id="m-yr" value="2026"/></label>
+    <button class="btn-rose full mt" onclick="addMovie()">Save</button>
+  </div>
+</div>
+
+<!-- Add Showtime -->
+<div class="overlay hidden" id="add-showtime-modal" onclick="closeOverlay(event,'add-showtime-modal')">
+  <div class="modal sm-modal">
+    <button class="close-btn" onclick="closeModal('add-showtime-modal')">✕</button>
+    <h2 style="margin-bottom:1.25rem">Add Showtime</h2>
+    <label>Movie<select id="st-movie"></select></label>
+    <label>Hall<select id="st-hall"></select></label>
+    <label>Date & Time<input type="datetime-local" id="st-time"/></label>
+    <label>Price (₦)<input type="number" id="st-price" value="2500" step="100"/></label>
+    <button class="btn-rose full mt" onclick="addShowtime()">Create</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="/static/js/admin.js"></script>
+</body>
+</html>
