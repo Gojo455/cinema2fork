@@ -13,7 +13,7 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = os.environ.get('cinema_SECRET', secrets.token_hex(32))
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'instance', 'cinema.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'cinema.db')
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 SEAT_LOCKS    = {}   # { "showtime:row:col": {user_id, expires} }
@@ -802,6 +802,12 @@ def admin_bookings():
 @app.route('/api/halls')
 def get_halls():
     return jsonify([dict(h) for h in qdb("SELECT h.*,c.name as cinema_name FROM halls h JOIN cinemas c ON h.cinema_id=c.id")])
+
+with app.app_context():
+    init_db()
+
+if __name__ == '__main__':
+    init_db()
 
 if __name__ == '__main__':
     init_db()
