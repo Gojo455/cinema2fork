@@ -359,7 +359,7 @@ async function selectSeat(seatObj) {
   if (r.error) { toast(r.error, 'error'); return; }
 
   S.selectedSeat = seatObj;
-  S.lockExpiry   = new Date(r.locked_until);
+  S.lockExpiry = new Date(r.locked_until + 'Z');
 
   await drawSeatMap(S.showtimeId, true);
   startLockTimer();
