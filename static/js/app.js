@@ -405,25 +405,48 @@ function startLockTimer() {
 
 // ─── PAYMENT ───────────────────────────────────────────────────────────────
 async function goToPayment() {
-  if (!S.selectedSeat || !S.showtimeId) return;
+  // 1. Safety Check: If no seat is selected, stop immediately
+  if (!S.selectedSeat || !S.showtimeId) {
+    toast("No seat selected. Please pick a seat first.", "error");
+    return;
+  }
 
   const r = await api('/api/bookings/initiate', {
     method: 'POST',
     body: { showtime_id: S.showtimeId, seat_id: S.selectedSeat.id }
   });
-  if (r.error) { toast(r.error, 'error'); return; }
+
+  if (r.error) {
+    toast(r.error, 'error');
+    return;
+  }
 
   S.booking = r;
   clearInterval(S.seatPoll);
-  closeSeatModal();
 
+  // Capture the seat reference before closing the seat modal
   const seat = S.selectedSeat;
-  const tags = seat.position_tags ? JSON.parse(seat.position_tags) : [];
 
+  closeSeatModal(); // NOTE: Your closeSeatModal() function sets S.selectedSeat to null!
+
+  // 2. Data Recovery: Ensure position_tags is parsed correctly
+  let tags = [];
+  try {
+    tags = typeof seat.position_tags === 'string'
+           ? JSON.parse(seat.position_tags)
+           : (seat.position_tags || []);
+  } catch (e) {
+    console.error("Error parsing tags", e);
+  }
+
+  // 3. Render Payment Content (Safe from null errors)
   ge('payment-content').innerHTML = `
     <h2 class="pay-title">Confirm Your Booking</h2>
     <p class="pay-sub">Review your selection before paying via Paystack</p>
-    <div class="pay-row"><span class="pay-lbl">Seat</span><span>${seat.row_label}${seat.seat_number} · ${tags.join(', ')}</span></div>
+    <div class="pay-row">
+        <span class="pay-lbl">Seat</span>
+        <span>${seat.row_label}${seat.seat_number} · ${tags.join(', ')}</span>
+    </div>
     <div class="pay-row"><span class="pay-lbl">Seat Quality</span><span>${seat.quality_score}/10</span></div>
     <div class="pay-row"><span class="pay-lbl">Reference</span><span style="font-size:0.78rem">${r.payment_ref}</span></div>
     <div class="pay-row"><span class="pay-lbl">Amount</span><span class="pay-total">₦${Number(r.amount).toLocaleString()}</span></div>
@@ -435,7 +458,6 @@ async function goToPayment() {
 
   openModal('payment-modal');
 }
-
 function launchPaystack() {
   const b = S.booking;
   if (!b) return;
