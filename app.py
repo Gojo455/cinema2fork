@@ -622,44 +622,73 @@ def get_cinemas():
 def my_prefs():
     return jsonify(get_prefs(session['user_id']))
 
-# ── Seat API ───────────────────────────────────────────────────────────────
+
+# ── Seat API (Fixed for Timezone Sync) ───────────────────────────────────────
 @app.route('/api/seats/<int:sid>')
 def get_seats(sid):
+    # Fix: Use utcnow() so the comparison matches the DB storage
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     db = get_db()
-    db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE showtime_id=? AND status='locked' AND locked_until<?", (sid, now))
+    db.execute("""
+        UPDATE seats 
+        SET status='available', locked_by=NULL, locked_until=NULL 
+        WHERE showtime_id=? AND status='locked' AND locked_until<?
+    """, (sid, now))
     db.commit()
+
     seats = qdb(
         """SELECT id,row_num,col_num,row_label,seat_number,quality_score,
                   position_tags,status,
                   CASE WHEN locked_by=? THEN 1 ELSE 0 END as my_lock
            FROM seats WHERE showtime_id=? ORDER BY row_num,col_num""",
-        (session.get('user_id',-1), sid))
+        (session.get('user_id', -1), sid))
     st = qdb("""SELECT s.*,m.title FROM showtimes s JOIN movies m ON s.movie_id=m.id WHERE s.id=?""", (sid,), one=True)
-    if not st: return jsonify({'error':'Not found'}), 404
-    return jsonify({'seats':[dict(s) for s in seats],'showtime':dict(st)})
+    if not st: return jsonify({'error': 'Not found'}), 404
+    return jsonify({'seats': [dict(s) for s in seats], 'showtime': dict(st)})
+
 
 @app.route('/api/seats/lock', methods=['POST'])
 @auth_required
 def lock_seat():
     d = request.get_json()
     seat_id, showtime_id = d.get('seat_id'), d.get('showtime_id')
-    now = datetime.utcnow()
-    db = get_db()
-    # Clear expired locks globally
-    db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE status='locked' AND locked_until<?", (now.strftime('%Y-%m-%d %H:%M:%S'),))
-    seat = qdb("SELECT * FROM seats WHERE id=? AND showtime_id=?", (seat_id, showtime_id), one=True)
-    if not seat: return jsonify({'error':'Seat not found'}), 404
-    if seat['status'] == 'booked': return jsonify({'error':'Seat already booked'}), 409
-    if seat['status'] == 'locked' and seat['locked_by'] != session['user_id']:
-        return jsonify({'error':'Seat is held by another user — please choose another'}), 409
-    # Release any other lock by this user in this showtime
-    db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE showtime_id=? AND locked_by=? AND status='locked'", (showtime_id, session['user_id']))
-  lock_until = (now + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
-    db.execute("UPDATE seats SET status='locked',locked_by=?,locked_until=? WHERE id=?", (session['user_id'], lock_until, seat_id))
-    db.commit()
-        return jsonify({'success':True,'locked_until':lock_until})
 
+    # Fix: Use utcnow() for consistent server-side timing
+    now = datetime.utcnow()
+    now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+    db = get_db()
+
+    # Clear expired locks globally before checking availability
+    db.execute("""
+        UPDATE seats SET status='available', locked_by=NULL, locked_until=NULL 
+        WHERE status='locked' AND locked_until<?
+    """, (now_str,))
+
+    seat = qdb("SELECT * FROM seats WHERE id=? AND showtime_id=?", (seat_id, showtime_id), one=True)
+    if not seat: return jsonify({'error': 'Seat not found'}), 404
+    if seat['status'] == 'booked': return jsonify({'error': 'Seat already booked'}), 409
+
+    if seat['status'] == 'locked' and seat['locked_by'] != session['user_id']:
+        return jsonify({'error': 'Seat is held by another user'}), 409
+
+    # Release any other seat this specific user was holding for this showtime
+    db.execute("""
+        UPDATE seats SET status='available', locked_by=NULL, locked_until=NULL 
+        WHERE showtime_id=? AND locked_by=? AND status='locked'
+    """, (showtime_id, session['user_id']))
+
+    # Fix: Set expiration and format as string for SQLite
+    lock_until_dt = now + timedelta(seconds=LOCK_DURATION)
+    lock_until_str = lock_until_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    db.execute("""
+        UPDATE seats SET status='locked', locked_by=?, locked_until=? 
+        WHERE id=?
+    """, (session['user_id'], lock_until_str, seat_id))
+    db.commit()
+
+    # Return the string. Important: In your frontend app.js, append 'Z' to this string so Javascript knows it is UTC!
+    return jsonify({'success': True, 'locked_until': lock_until_str})
 @app.route('/api/seats/unlock', methods=['POST'])
 @auth_required
 def unlock_seat():
