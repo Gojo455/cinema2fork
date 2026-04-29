@@ -625,7 +625,7 @@ def my_prefs():
 # ── Seat API ───────────────────────────────────────────────────────────────
 @app.route('/api/seats/<int:sid>')
 def get_seats(sid):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     db = get_db()
     db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE showtime_id=? AND status='locked' AND locked_until<?", (sid, now))
     db.commit()
@@ -644,7 +644,7 @@ def get_seats(sid):
 def lock_seat():
     d = request.get_json()
     seat_id, showtime_id = d.get('seat_id'), d.get('showtime_id')
-    now = datetime.now()
+    now = datetime.utcnow()
     db = get_db()
     # Clear expired locks globally
     db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE status='locked' AND locked_until<?", (now.strftime('%Y-%m-%d %H:%M:%S'),))
@@ -655,7 +655,7 @@ def lock_seat():
         return jsonify({'error':'Seat is held by another user — please choose another'}), 409
     # Release any other lock by this user in this showtime
     db.execute("UPDATE seats SET status='available',locked_by=NULL,locked_until=NULL WHERE showtime_id=? AND locked_by=? AND status='locked'", (showtime_id, session['user_id']))
-    lock_until = (now + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+  lock_until = (now + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
     db.execute("UPDATE seats SET status='locked',locked_by=?,locked_until=? WHERE id=?", (session['user_id'], lock_until, seat_id))
     db.commit()
     return jsonify({'success':True,'locked_until':lock_until})
