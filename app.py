@@ -658,7 +658,7 @@ def lock_seat():
   lock_until = (now + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
     db.execute("UPDATE seats SET status='locked',locked_by=?,locked_until=? WHERE id=?", (session['user_id'], lock_until, seat_id))
     db.commit()
-    return jsonify({'success':True,'locked_until':lock_until})
+        return jsonify({'success':True,'locked_until':lock_until})
 
 @app.route('/api/seats/unlock', methods=['POST'])
 @auth_required
