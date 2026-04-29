@@ -523,36 +523,75 @@ function showConfirmation(b) {
   toast('Booking confirmed! Enjoy the show 🎬', 'success');
 }
 
-// ─── MY TICKETS ────────────────────────────────────────────────────────────
+// MY TICKETS
 async function loadTickets() {
   const list = ge('tickets-list');
   list.innerHTML = '<div class="shimmer"></div>';
   const bookings = await api('/api/my-bookings');
 
   if (!bookings.length) {
-    list.innerHTML = `<div class="empty-state"><div class="ei">🎟</div><h3>No tickets yet</h3><p>Book a film to see your tickets here</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="ei">🎟</div><h3>No booking history yet</h3><p>Book a film to see your history here</p></div>`;
     return;
   }
 
-  list.innerHTML = `<div class="tickets-list">${bookings.map(b => {
+  // Separate confirmed from pending
+  const confirmed = bookings.filter(b => b.status === 'confirmed');
+  const pending   = bookings.filter(b => b.status === 'pending');
+
+  function ticketCard(b) {
     const tags = b.position_tags ? JSON.parse(b.position_tags) : [];
-    return `<div class="ticket">
-      <img class="tix-poster" src="${esc(b.poster_url||'')}" alt="${esc(b.title)}" onerror="this.src=''"/>
-      <div>
+    const isConfirmed = b.status === 'confirmed';
+    const badgeStyle  = isConfirmed
+      ? 'background:var(--sage-dim);color:var(--sage);border:1px solid var(--sage)'
+      : 'background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold)';
+    const badgeText = isConfirmed ? '✓ Confirmed' : '⏳ Pending';
+    const showtime  = new Date(b.showtime);
+    const isPast    = showtime < new Date();
+
+    return `<div class="ticket" style="${isPast && isConfirmed ? 'opacity:0.6' : ''}">
+      <img class="tix-poster" src="${esc(b.poster_url||'')}" alt="${esc(b.title)}"
+           onerror="this.style.display='none'"/>
+      <div style="flex:1">
         <div class="tix-title">${esc(b.title)}</div>
+        <div style="font-size:0.72rem;color:var(--rose);margin-bottom:0.3rem">${esc(b.genre||'')}</div>
         <div class="tix-meta">
           🏛 ${esc(b.cinema_name||b.hall_name)}<br>
-          📅 ${fmtDateTime(b.showtime)}<br>
+          📅 ${fmtDateTime(b.showtime)} ${isPast ? '<span style="color:var(--text3)">(Past)</span>' : ''}<br>
           💺 Seat ${b.row_label}${b.seat_number} · ${tags.join(', ')} · Quality ${b.quality_score}/10<br>
-          💳 ₦${Number(b.price||b.amount).toLocaleString()}
+          💳 ₦${Number(b.price||b.amount).toLocaleString()}<br>
+          🔖 Ref: <span style="font-size:0.7rem;color:var(--text3)">${b.payment_ref||'—'}</span>
         </div>
       </div>
-      <div class="tix-badge">✓ Confirmed</div>
+      <div style="${badgeStyle};border-radius:var(--radius-pill);padding:0.28rem 0.85rem;font-size:0.72rem;font-weight:700;white-space:nowrap;align-self:flex-start">
+        ${badgeText}
+      </div>
     </div>`;
-  }).join('')}</div>`;
+  }
+
+  let html = '';
+
+  if (confirmed.length) {
+    html += `<div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:0.75rem">
+               ✓ Confirmed Bookings <span style="font-size:0.8rem;color:var(--text2);font-family:var(--font-body)">(${confirmed.length})</span>
+             </div>`;
+    html += `<div class="tickets-list" style="margin-bottom:2rem">${confirmed.map(ticketCard).join('')}</div>`;
+  }
+
+  if (pending.length) {
+    html += `<div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:0.75rem">
+               ⏳ Pending Payments <span style="font-size:0.8rem;color:var(--text2);font-family:var(--font-body)">(${pending.length})</span>
+             </div>`;
+    html += `<div class="tickets-list">${pending.map(ticketCard).join('')}</div>`;
+  }
+
+  if (!confirmed.length && !pending.length) {
+    html = `<div class="empty-state"><div class="ei">🎟</div><h3>No booking history yet</h3><p>Book a film to see your history here</p></div>`;
+  }
+
+  list.innerHTML = html;
 }
 
-// ─── CINEMAS ───────────────────────────────────────────────────────────────
+//  CINEMAS
 async function loadCinemas() {
   const cinemas = await api('/api/cinemas');
   const icons = ['🎬','🎭','🎞','🍿'];

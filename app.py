@@ -4,7 +4,7 @@ Abuja, Nigeria | Flask + SQLite | Hybrid Recommender | Paystack Payments
 """
 
 
-# ── Paystack Keys ──────────────────────────────────────────────────────────
+# Paystack Keys
 from flask import Flask, render_template, request, jsonify, session, g, redirect
 import sqlite3, hashlib, secrets, json, os, time, random, math
 from datetime import datetime, timedelta
@@ -16,7 +16,7 @@ app.secret_key = os.environ.get('cinema_SECRET', secrets.token_hex(32))
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'cinema.db')
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-SEAT_LOCKS    = {}   # { "showtime:row:col": {user_id, expires} }
+SEAT_LOCKS = {}   # { "showtime:row:col": {user_id, expires} }
 LOCK_DURATION = 300  # seconds
 
 # Paystack keys — replace with your own from dashboard.paystack.com
@@ -24,7 +24,9 @@ LOCK_DURATION = 300  # seconds
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_527e7adc01bbe74b54897f6b58cf1555e683ccaf')
 PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_b695c7bf0b597ddebfe2f70ff4aa73927dd1d1de')
 
-# ── DB Helpers ─────────────────────────────────────────────────────────────
+#  DB Helpers
+
+
 def get_db():
     db = getattr(g, '_db', None)
     if db is None:
@@ -34,21 +36,24 @@ def get_db():
         db.execute("PRAGMA foreign_keys=ON")
     return db
 
+
 @app.teardown_appcontext
 def close_db(e):
     db = getattr(g, '_db', None)
     if db: db.close()
+
 
 def qdb(sql, args=(), one=False):
     cur = get_db().execute(sql, args)
     rv = cur.fetchall(); cur.close()
     return (rv[0] if rv else None) if one else rv
 
+
 def xdb(sql, args=()):
     db = get_db(); cur = db.execute(sql, args); db.commit()
     return cur.lastrowid
 
-# ── Seat Quality Engine ────────────────────────────────────────────────────
+# The Seat Quality Engine
 def compute_seat_quality(row, col, total_rows, total_cols):
     """
     Objective seat quality score 0–10.
@@ -74,6 +79,7 @@ def compute_seat_quality(row, col, total_rows, total_cols):
     q = (rs * 0.60 + cs * 0.40) * 10
     return round(min(max(q, 0.5), 10.0), 2)
 
+
 def classify_seat(row, col, total_rows, total_cols):
     """Return position tags list: [center/aisle/edge, front/middle/back]."""
     tags = []
@@ -87,16 +93,19 @@ def classify_seat(row, col, total_rows, total_cols):
     else:           tags.append('middle')
     return tags
 
-# ── Recommendation Engine ──────────────────────────────────────────────────
+#  Recommendation Engine
+
 def get_prefs(user_id):
     p = qdb("SELECT * FROM user_preferences WHERE user_id=?", (user_id,), one=True)
     return dict(p) if p else {
         'genre_weights':'{}','seat_position_pref':'center',
         'seat_zone_pref':'middle','avg_quality_pref':7.0,'booking_count':0}
 
+
 def jaccard(a, b):
     if not a and not b: return 0.0
     return len(a & b) / len(a | b) if (a | b) else 0.0
+
 
 def collab_score(user_id, movie_id):
     """Jaccard-based collaborative filtering on genre booking history."""
@@ -121,6 +130,7 @@ def collab_score(user_id, movie_id):
         sims.append(jaccard(user_genres, og))
     return min(sum(sims)/len(sims)*1.5, 1.0) if sims else 0.0
 
+
 def seat_pref_match(available_seats, prefs):
     """
     Score how well available seats match user's subjective seat preferences.
@@ -128,7 +138,7 @@ def seat_pref_match(available_seats, prefs):
     Checks position tag (center/aisle/edge) and zone (front/middle/back).
     """
     if not available_seats: return 0.0, 0.0
-    pos_pref  = prefs.get('seat_position_pref', 'center')
+    pos_pref = prefs.get('seat_position_pref', 'center')
     zone_pref = prefs.get('seat_zone_pref', 'middle')
     avg_q_pref = float(prefs.get('avg_quality_pref', 7.0))
     best_score, best_q = 0.0, 0.0
@@ -148,6 +158,7 @@ def seat_pref_match(available_seats, prefs):
             best_score, best_q = combined, q
     return best_score, best_q
 
+
 def recommend(user_id, limit=12):
     """
     Full hybrid recommendation combining:
@@ -157,8 +168,8 @@ def recommend(user_id, limit=12):
     4. Rating bonus
     """
     prefs = get_prefs(user_id)
-    gw    = json.loads(prefs.get('genre_weights', '{}'))
-    now   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    gw = json.loads(prefs.get('genre_weights', '{}'))
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     showtimes = qdb(
         """SELECT s.*, m.title, m.genre, m.rating, m.description,
@@ -176,23 +187,23 @@ def recommend(user_id, limit=12):
         avail_ratio = len(avail) / total
         if avail_ratio == 0: continue
 
-        # ── 1. Content-based genre score
+        # 1. Content-based genre score
         genre_s = min(gw.get(st['genre'], 0.0), 1.0)
 
-        # ── 2. Collaborative
+        #  2. Collaborative
         collab  = collab_score(user_id, mid)
 
-        # ── 3a. Subjective seat preference match
+        #  3a. Subjective seat preference match
         pref_s, best_q = seat_pref_match(avail, prefs)
 
-        # ── 3b. Objective seat quality (avg of available seats)
+        # 3b. Objective seat quality (avg of available seats)
         avg_q = sum(float(s['quality_score']) for s in avail) / len(avail) if avail else 0
         quality_s = avg_q / 10.0
 
-        # ── 3c. Availability
+        # 3c. Availability
         avail_s = min(avail_ratio * 1.2, 1.0)
 
-        # ── 3d. Showtime proximity (2–12 hrs = ideal)
+        # 3d. Showtime proximity (2–12 hrs = ideal)
         try:
             hrs = (datetime.strptime(st['showtime'], '%Y-%m-%d %H:%M:%S') - datetime.now()).total_seconds()/3600
             if 2 <= hrs <= 12:    time_s = 1.0
@@ -200,10 +211,10 @@ def recommend(user_id, limit=12):
             else:                 time_s = max(0.2, 1-(hrs-12)/72)
         except: time_s = 0.5
 
-        # ── 4. Rating bonus
+        # 4. Rating bonus
         rating_s = float(st['rating'] or 0) / 10.0
 
-        # ── Weighted final score
+        #  Weighted final score
         W = dict(genre=0.20, collab=0.15, pref=0.20, quality=0.15,
                  avail=0.10, time=0.10, rating=0.10)
         score = (W['genre']*genre_s + W['collab']*collab + W['pref']*pref_s
@@ -228,6 +239,7 @@ def recommend(user_id, limit=12):
                 'pref_match': round(pref_s*100), 'avail_pct': round(avail_ratio*100),
             }
     return sorted(scored.values(), key=lambda x: x['score'], reverse=True)[:limit]
+
 
 def learn_preferences(user_id, movie_id, seat_id):
     """Implicit preference learning after each confirmed booking."""
@@ -260,17 +272,20 @@ def learn_preferences(user_id, movie_id, seat_id):
             (user_id, json.dumps(gw), new_pos, new_zone, float(seat['quality_score']), 1))
     db.commit()
 
-# ── Auth Helpers ───────────────────────────────────────────────────────────
+#  Auth Helpers
+
 def hash_pw(pw):
     salt = secrets.token_hex(16)
     h = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000)
     return f"{salt}:{h.hex()}"
+
 
 def verify_pw(stored, given):
     try:
         salt, h = stored.split(':')
         return hashlib.pbkdf2_hmac('sha256', given.encode(), salt.encode(), 100000).hex() == h
     except: return False
+
 
 def auth_required(f):
     @wraps(f)
@@ -279,6 +294,7 @@ def auth_required(f):
         return f(*a, **kw)
     return d
 
+
 def admin_required(f):
     @wraps(f)
     def d(*a, **kw):
@@ -286,7 +302,9 @@ def admin_required(f):
         return f(*a, **kw)
     return d
 
-# ── Database Init ──────────────────────────────────────────────────────────
+#  Database Init
+
+
 def init_db():
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
@@ -362,10 +380,11 @@ def init_db():
         seed(db)
     db.close()
 
+
 def seed(db):
     import random; random.seed(99)
 
-    # ── Movies data (from TMDB) ───────────────────────────────────────────
+    #  Movies data (from TMDB)
     TMDB = "https://image.tmdb.org/t/p/w500"
     movies = [
         
@@ -450,7 +469,7 @@ def seed(db):
             """INSERT INTO movies (title,genre,description,duration_min,rating,
                poster_url,director,cast_list,release_year) VALUES (?,?,?,?,?,?,?,?,?)""", movie_data)
 
-    # ── Real Abuja cinemas ─────────────────────────────────────────────────
+    # Real Abuja cinemas
     cinemas_data = [
         ("Silverbird Cinemas",   "Central Business District", "Silverbird Entertainment Centre, Herbert Macaulay Way, CBD, Abuja"),
         ("Genesis Cinemas",      "Ceddi Plaza, Central Area", "Ceddi Plaza, Michael Okpara Way, Wuse Zone 5, Abuja"),
@@ -462,7 +481,7 @@ def seed(db):
         cur = db.execute("INSERT INTO cinemas (name,location,address) VALUES (?,?,?)", c)
         cinema_ids.append(cur.lastrowid)
 
-    # ── Halls per cinema ───────────────────────────────────────────────────
+    # Halls per cinema
     hall_configs = [
         # (cinema_idx, hall_name, rows, cols)
         (0, "Hall 1 – Main",    12, 16),
@@ -485,7 +504,7 @@ def seed(db):
     movie_ids = [r[0] for r in db.execute("SELECT id FROM movies").fetchall()]
     cinema_names = [c[0] for c in cinemas_data]
 
-    # ── Showtimes: next 5 days, multiple slots ─────────────────────────────
+    # Showtimes: next 5 days, multiple slots
     base    = datetime.now().replace(minute=0, second=0, microsecond=0)
     times   = [10, 13, 16, 19, 22]
     prices  = [2500, 3000, 2000, 2000, 3500, 4000, 2500, 2000]  # per hall
@@ -508,7 +527,7 @@ def seed(db):
                  show_dt.strftime('%Y-%m-%d %H:%M:%S'), price))
             showtime_records.append((cur.lastrowid, hid, rows, cols))
 
-    # ── Seats for each showtime ────────────────────────────────────────────
+    #  Seats for each showtime
     for stid, hid, rows, cols in showtime_records:
         hall = db.execute("SELECT * FROM halls WHERE id=?", (hid,)).fetchone()
         tr, tc = hall['total_rows'], hall['total_cols']
@@ -533,7 +552,7 @@ def seed(db):
                ("demo","demo@abujacine.ng", hash_pw("demo123"), 0))
     db.commit()
 
-# ── Page Routes ────────────────────────────────────────────────────────────
+# Page Routes
 @app.route('/')
 def index():
     return render_template('index.html', paystack_public_key=PAYSTACK_PUBLIC_KEY)
@@ -543,7 +562,7 @@ def admin():
     if not session.get('is_admin'): return redirect('/')
     return render_template('admin.html')
 
-# ── Auth API ───────────────────────────────────────────────────────────────
+# Auth API
 @app.route('/api/register', methods=['POST'])
 def register():
     d = request.get_json()
@@ -560,8 +579,10 @@ def register():
 def login():
     d = request.get_json()
     user = qdb("SELECT * FROM users WHERE username=? OR email=?", (d.get('username',''),)*2, one=True)
-    if not user or not verify_pw(user['password_hash'], d.get('password','')):
-        return jsonify({'error':'Invalid credentials'}), 401
+    if not user:
+        return jsonify({'error': 'Incorrect username or email'}), 401
+    if not verify_pw(user['password_hash'], d.get('password', '')):
+        return jsonify({'error': 'Incorrect password'}), 401
     session.update({'user_id':user['id'],'username':user['username'],'is_admin':bool(user['is_admin'])})
     return jsonify({'success':True,'username':user['username'],'is_admin':bool(user['is_admin'])})
 
@@ -575,7 +596,7 @@ def me():
     return jsonify({'logged_in':True,'user_id':session['user_id'],
                     'username':session['username'],'is_admin':session.get('is_admin',False)})
 
-# ── Movie API ──────────────────────────────────────────────────────────────
+# Movie API
 @app.route('/api/movies')
 def get_movies():
     genre  = request.args.get('genre')
@@ -623,7 +644,7 @@ def my_prefs():
     return jsonify(get_prefs(session['user_id']))
 
 
-# ── Seat API (Fixed for Timezone Sync) ───────────────────────────────────────
+# Seat API (Fixed for Timezone Sync)
 @app.route('/api/seats/<int:sid>')
 def get_seats(sid):
     # Fix: Use utcnow() so the comparison matches the DB storage
@@ -698,7 +719,7 @@ def unlock_seat():
     db.commit()
     return jsonify({'success':True})
 
-# ── Booking API ────────────────────────────────────────────────────────────
+# Booking APIs
 @app.route('/api/bookings/initiate', methods=['POST'])
 @auth_required
 def initiate_booking():
@@ -754,11 +775,11 @@ def my_bookings():
            JOIN showtimes s ON b.showtime_id=s.id
            JOIN movies m ON s.movie_id=m.id
            JOIN seats se ON b.seat_id=se.id
-           WHERE b.user_id=? AND b.status='confirmed'
+           WHERE b.user_id=?
            ORDER BY b.created_at DESC""", (session['user_id'],))
     return jsonify([dict(r) for r in rows])
 
-# ── Admin API ──────────────────────────────────────────────────────────────
+# Admin API
 @app.route('/api/admin/stats')
 @admin_required
 def admin_stats():
