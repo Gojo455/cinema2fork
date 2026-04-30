@@ -41,11 +41,27 @@ function setUser(u) {
 
 async function login() {
   const username = val('login-user'), password = val('login-pass');
-  const errEl = ge('login-err'); hide(errEl);
-  if (!username || !password) { showErr(errEl, 'Please fill in all fields'); return; }
+  const errEl = ge('login-err');
+  hide(errEl); // Reset error state
+
+  if (!username || !password) {
+    showErr(errEl, 'Please enter both username and password');
+    toast('Missing credentials', 'error');
+    return;
+  }
+
   const r = await api('/api/login', { method: 'POST', body: { username, password } });
-  if (r.error) { showErr(errEl, r.error); return; }
-  setUser(r); closeModal('login-modal');
+
+  if (r.error) {
+    // This handles "Incorrect password" or "User not found" from Flask
+    showErr(errEl, r.error);
+    toast(r.error, 'error'); // This creates the "Pop-up" at the bottom
+    return;
+  }
+
+  // Success path
+  setUser(r);
+  closeModal('login-modal');
   toast('Welcome back, ' + r.username + ' ✦', 'success');
   if (r.is_admin) window.location.href = '/admin';
 }
