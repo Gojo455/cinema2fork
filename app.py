@@ -575,16 +575,23 @@ def register():
     session.update({'user_id':uid,'username':u,'is_admin':False})
     return jsonify({'success':True,'username':u})
 
+
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.get_json()
-    user = qdb("SELECT * FROM users WHERE username=? OR email=?", (d.get('username',''),)*2, one=True)
+    user = qdb("SELECT * FROM users WHERE username=? OR email=?", (d.get('username', ''),) * 2, one=True)
+
+    # Define the generic message here
+    error_msg = 'Invalid email or password'
+
     if not user:
-        return jsonify({'error': 'Incorrect username or email'}), 401
+        return jsonify({'error': error_msg}), 401
+
     if not verify_pw(user['password_hash'], d.get('password', '')):
-        return jsonify({'error': 'Incorrect password'}), 401
-    session.update({'user_id':user['id'],'username':user['username'],'is_admin':bool(user['is_admin'])})
-    return jsonify({'success':True,'username':user['username'],'is_admin':bool(user['is_admin'])})
+        return jsonify({'error': error_msg}), 401
+
+    session.update({'user_id': user['id'], 'username': user['username'], 'is_admin': bool(user['is_admin'])})
+    return jsonify({'success': True, 'username': user['username'], 'is_admin': bool(user['is_admin'])})
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
