@@ -570,36 +570,54 @@ async function loadTickets() {
   // Separate confirmed from pending
   const confirmed = bookings.filter(b => b.status === 'confirmed');
   const pending   = bookings.filter(b => b.status === 'pending');
+function ticketCard(b) {
+  const tags = b.position_tags ? JSON.parse(b.position_tags) : [];
 
-  function ticketCard(b) {
-    const tags = b.position_tags ? JSON.parse(b.position_tags) : [];
-    const isConfirmed = b.status === 'confirmed';
-    const badgeStyle  = isConfirmed
-      ? 'background:var(--sage-dim);color:var(--sage);border:1px solid var(--sage)'
-      : 'background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold)';
-    const badgeText = isConfirmed ? '✓ Confirmed' : '⏳ Pending';
-    const showtime  = new Date(b.showtime);
-    const isPast    = showtime < new Date();
+  // 1. IMPROVED: Status-based Styling logic
+  let badgeStyle = '';
+  let badgeText = '';
 
-    return `<div class="ticket" style="${isPast && isConfirmed ? 'opacity:0.6' : ''}">
-      <img class="tix-poster" src="${esc(b.poster_url||'')}" alt="${esc(b.title)}"
-           onerror="this.style.display='none'"/>
-      <div style="flex:1">
-        <div class="tix-title">${esc(b.title)}</div>
-        <div style="font-size:0.72rem;color:var(--rose);margin-bottom:0.3rem">${esc(b.genre||'')}</div>
-        <div class="tix-meta">
-          🏛 ${esc(b.cinema_name||b.hall_name)}<br>
-          📅 ${fmtDateTime(b.showtime)} ${isPast ? '<span style="color:var(--text3)">(Past)</span>' : ''}<br>
-          💺 Seat ${b.row_label}${b.seat_number} · ${tags.join(', ')} · Quality ${b.quality_score}/10<br>
-          💳 ₦${Number(b.price||b.amount).toLocaleString()}<br>
-          🔖 Ref: <span style="font-size:0.7rem;color:var(--text3)">${b.payment_ref||'—'}</span>
-        </div>
-      </div>
-      <div style="${badgeStyle};border-radius:var(--radius-pill);padding:0.28rem 0.85rem;font-size:0.72rem;font-weight:700;white-space:nowrap;align-self:flex-start">
-        ${badgeText}
-      </div>
-    </div>`;
+  if (b.status === 'confirmed') {
+    badgeStyle = 'background:var(--sage-dim);color:var(--sage);border:1px solid var(--sage)';
+    badgeText = '✓ Confirmed';
+  } else if (b.status === 'failed') {
+    badgeStyle = 'background:var(--rose-dim);color:var(--rose);border:1px solid var(--rose)';
+    badgeText = '✕ Failed';
+  } else {
+    // Default to Pending for everything else
+    badgeStyle = 'background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold)';
+    badgeText = '⏳ Pending';
   }
+
+  const showtime  = new Date(b.showtime);
+  const isPast    = showtime < new Date();
+
+ 
+ return `
+  <div class="ticket">
+    <div style="width:72px; height:100px; background:var(--bg3); border-radius:4px; overflow:hidden;">
+      <img class="tix-poster" src="${esc(b.poster_url||'')}"
+           style="width:100%; height:100%; object-fit:cover;"
+           onerror="this.parentElement.style.display='none'"/>
+    </div>
+
+    <div class="tix-info" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="tix-title" style="font-weight:700; font-size:1.1rem; margin-bottom: 0.2rem;">${esc(b.title)}</div>
+      <div style="font-size:0.72rem; color:var(--rose); margin-bottom:0.5rem; display:flex; gap:0.4rem; flex-wrap:wrap;">
+        ${(b.genre||'').split(',').map(g => `<span>${g.trim()}</span>`).join(' · ')}
+      </div>
+      <div class="tix-meta" style="font-size:0.85rem; line-height:1.5; color:var(--text2)">
+        <span style="display:block">🏛 ${esc(b.cinema_name||b.hall_name)}</span>
+        <span style="display:block">📅 ${fmtDateTime(b.showtime)}</span>
+        <span style="display:block">💺 Seat <b>${b.row_label}${b.seat_number}</b> · Quality ${b.quality_score}/10</span>
+      </div>
+    </div>
+
+    <div class="status-badge" style="${badgeStyle}">
+      ${badgeText}
+    </div>
+  </div>`;
+}
 
   let html = '';
 

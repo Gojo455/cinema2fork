@@ -790,18 +790,25 @@ def verify_booking():
            WHERE b.id=?""", (bid,), one=True)
     return jsonify({'success':True,'booking':dict(det)})
 
+
 @app.route('/api/my-bookings')
 @auth_required
 def my_bookings():
+    # We use LEFT JOIN for movies, showtimes, and seats.
+    # This ensures the booking row is ALWAYS returned even if
+    # other linked data has changed or is missing.
     rows = qdb(
-        """SELECT b.*,m.title,m.genre,m.poster_url,s.showtime,s.hall_name,s.cinema_name,s.price,
-                  se.row_label,se.seat_number,se.quality_score,se.position_tags
+        """SELECT b.*, 
+                  m.title, m.genre, m.poster_url, 
+                  s.showtime, s.hall_name, s.cinema_name, s.price,
+                  se.row_label, se.seat_number, se.quality_score, se.position_tags
            FROM bookings b
-           JOIN showtimes s ON b.showtime_id=s.id
-           JOIN movies m ON s.movie_id=m.id
-           JOIN seats se ON b.seat_id=se.id
-           WHERE b.user_id=?
+           LEFT JOIN showtimes s ON b.showtime_id = s.id
+           LEFT JOIN movies m ON s.movie_id = m.id
+           LEFT JOIN seats se ON b.seat_id = se.id
+           WHERE b.user_id = ?
            ORDER BY b.created_at DESC""", (session['user_id'],))
+
     return jsonify([dict(r) for r in rows])
 
 # Admin API

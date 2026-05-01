@@ -490,12 +490,24 @@ input[type="date"].filter-input {
 
 /* ─── TICKETS ────────────────────────────────────────────────────────────── */
 .tickets-list{display:flex;flex-direction:column;gap:0.9rem}
-.ticket{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:1.1rem 1.35rem;
-  display:grid;grid-template-columns:72px 1fr auto;
-  gap:1.1rem;align-items:center;
-  animation:fadeUp 0.3s ease both;
+.ticket {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  display: grid;
+  /* 72px for image, 1fr for text (takes rest of space), auto for badge */
+  grid-template-columns: 72px 1fr auto;
+  gap: 1.5rem;
+  align-items: center; /* Vertically centers the text and badge */
+}
+
+.tix-info {
+  min-width: 0; /* Prevents text overflow from breaking the grid */
+}
+
+.tix-meta span {
+  margin-bottom: 2px;
 }
 .tix-poster{width:72px;height:108px;object-fit:cover;border-radius:8px;background:var(--bg3)}
 .tix-title{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin-bottom:0.2rem}
@@ -505,6 +517,19 @@ input[type="date"].filter-input {
   border:1px solid var(--rose);border-radius:var(--radius-pill);
   padding:0.28rem 0.85rem;font-size:0.72rem;font-weight:700;
   white-space:nowrap;
+}
+
+/* Keep your existing .ticket grid, but add this for the badge */
+.status-badge {
+  justify-self: end;    /* Keeps it to the right of the 'auto' column */
+  align-self: center;   /* Prevents it from stretching vertically */
+  padding: 0.3rem 0.9rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;  /* Prevents text from breaking into two lines */
+  display: inline-flex; /* Ensures background only wraps the text */
+  align-items: center;
 }
 
 /* ─── CINEMAS ────────────────────────────────────────────────────────────── */
