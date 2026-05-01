@@ -322,6 +322,9 @@ def init_db():
         duration_min INTEGER, rating REAL DEFAULT 0,
         poster_url TEXT, director TEXT, cast_list TEXT,
         release_year INTEGER, is_active INTEGER DEFAULT 1,
+        age_rating TEXT DEFAULT 'PG',
+        is_featured INTEGER DEFAULT 0,
+        is_hot INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS cinemas (
@@ -606,13 +609,28 @@ def me():
 # Movie API
 @app.route('/api/movies')
 def get_movies():
-    genre  = request.args.get('genre')
+    genre = request.args.get('genre')
     search = request.args.get('search')
-    sql = "SELECT * FROM movies WHERE is_active=1"
+
+    # We use a JOIN to get the earliest upcoming showtime for each movie
+    # and a GROUP BY so we don't get duplicate movie entries
+    sql = """
+        SELECT m.*, MIN(s.showtime) as showtime 
+        FROM movies m
+        LEFT JOIN showtimes s ON m.id = s.movie_id
+        WHERE m.is_active = 1 AND s.showtime >= datetime('now')
+    """
     args = []
-    if genre:  sql += " AND genre=?"; args.append(genre)
-    if search: sql += " AND (title LIKE ? OR description LIKE ?)"; args += [f'%{search}%']*2
-    sql += " ORDER BY rating DESC"
+
+    if genre:
+        sql += " AND m.genre=?";
+        args.append(genre)
+    if search:
+        sql += " AND (m.title LIKE ? OR m.description LIKE ?)";
+        args += [f'%{search}%'] * 2
+
+    sql += " GROUP BY m.id ORDER BY m.rating DESC"
+
     return jsonify([dict(m) for m in qdb(sql, args)])
 
 @app.route('/api/movies/<int:mid>')
@@ -806,8 +824,12 @@ def admin_stats():
 def admin_movies():
     if request.method == 'POST':
         d = request.get_json()
-        mid = xdb("INSERT INTO movies (title,genre,description,duration_min,rating,poster_url,director,cast_list,release_year) VALUES (?,?,?,?,?,?,?,?,?)",
-                  (d['title'],d['genre'],d.get('description',''),d.get('duration_min',120),d.get('rating',7.0),d.get('poster_url',''),d.get('director',''),d.get('cast_list',''),d.get('release_year',2026)))
+        mid = xdb(
+            "INSERT INTO movies (title,genre,description,duration_min,rating,poster_url,director,cast_list,release_year,age_rating,is_featured,is_hot) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (d['title'], d['genre'], d.get('description', ''), d.get('duration_min', 120),
+             d.get('rating', 7.0), d.get('poster_url', ''), d.get('director', ''),
+             d.get('cast_list', ''), d.get('release_year', 2026),
+             d.get('age_rating', 'PG'), d.get('is_featured', 0), d.get('is_hot', 0)))
         return jsonify({'success':True,'movie_id':mid})
     return jsonify([dict(m) for m in qdb("SELECT * FROM movies ORDER BY created_at DESC")])
 
@@ -818,8 +840,10 @@ def admin_movie(mid):
         xdb("UPDATE movies SET is_active=0 WHERE id=?", (mid,))
         return jsonify({'success':True})
     d = request.get_json()
-    xdb("UPDATE movies SET title=?,genre=?,description=?,duration_min=?,rating=?,poster_url=?,director=?,is_active=? WHERE id=?",
-        (d['title'],d['genre'],d.get('description'),d.get('duration_min',120),d.get('rating',7),d.get('poster_url'),d.get('director'),d.get('is_active',1),mid))
+    xdb("UPDATE movies SET title=?,genre=?,description=?,duration_min=?,rating=?,poster_url=?,director=?,is_active=?,age_rating=?,is_featured=?,is_hot=? WHERE id=?",
+        (d['title'], d['genre'], d.get('description'), d.get('duration_min', 120),
+         d.get('rating', 7), d.get('poster_url'), d.get('director'), d.get('is_active', 1),
+         d.get('age_rating', 'PG'), d.get('is_featured', 0), d.get('is_hot', 0), mid))
     return jsonify({'success':True})
 
 @app.route('/api/admin/showtimes', methods=['GET','POST'])

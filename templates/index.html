@@ -75,18 +75,22 @@
 <main class="main">
 
   <!-- BROWSE -->
+
   <section class="section" id="section-browse">
     <div class="section-top">
       <div>
         <h2 class="section-title">Now Showing</h2>
         <p class="section-sub">Hollywood & Nollywood films across Abuja</p>
       </div>
-      <div class="filter-row">
-        <input class="filter-input" type="search" id="search-input" placeholder="Search films…" oninput="filterMovies()"/>
-        <select class="filter-select" id="genre-select" onchange="filterMovies()">
-          <option value="">All Genres</option>
-        </select>
-      </div>
+     <div class="filter-row">
+  <input class="filter-input" type="search" id="search-input" placeholder="Search films…" oninput="filterMovies()"/>
+
+  <select class="filter-select" id="genre-select" onchange="filterMovies()">
+    <option value="">All Genres</option>
+  </select>
+
+  <input class="filter-input" type="date" id="date-filter" onchange="filterMovies()"/>
+</div>
     </div>
     <div class="movies-grid" id="movies-grid"></div>
   </section>

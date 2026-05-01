@@ -121,9 +121,26 @@ async function loadGenres() {
 function filterMovies() {
   const q = val('search-input').toLowerCase();
   const g = val('genre-select');
-  const filtered = S.movies.filter(m =>
-    (!g || m.genre === g) &&
-    (!q || m.title.toLowerCase().includes(q) || (m.description||'').toLowerCase().includes(q)));
+  const d = val('date-filter'); // This is "YYYY-MM-DD"
+
+  const filtered = S.movies.filter(m => {
+    const matchGenre = !g || m.genre === g;
+    const matchSearch = !q || m.title.toLowerCase().includes(q);
+
+    let matchDate = true;
+    if (d) {
+      if (m.showtime) {
+        // Extract YYYY-MM-DD from "2026-05-15 18:00:00"
+        const movieDateOnly = m.showtime.split(' ')[0];
+        matchDate = (movieDateOnly === d);
+      } else {
+        // If movie has no showtime data, hide it when a date is selected
+        matchDate = false;
+      }
+    }
+    return matchGenre && matchSearch && matchDate;
+  });
+
   renderGrid(filtered, 'movies-grid', false);
 }
 
